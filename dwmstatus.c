@@ -17,9 +17,9 @@
 
 #include <X11/Xlib.h>
 
-char *tzargentina = "America/Buenos_Aires";
-char *tzutc = "UTC";
-char *tzberlin = "Europe/Berlin";
+char *tzny = "America/New_York";
+char *tzdk = "Europe/Copenhagen";
+char *tzuk = "Europe/London";
 
 static Display *dpy;
 
@@ -119,10 +119,9 @@ char *
 getbattery(char *base)
 {
 	char *co, status;
-	int descap, remcap;
+	int cap;
 
-	descap = -1;
-	remcap = -1;
+	cap = -1;
 
 	co = readfile(base, "present");
 	if (co == NULL)
@@ -133,23 +132,11 @@ getbattery(char *base)
 	}
 	free(co);
 
-	co = readfile(base, "charge_full_design");
-	if (co == NULL) {
-		co = readfile(base, "energy_full_design");
-		if (co == NULL)
-			return smprintf("");
-	}
-	sscanf(co, "%d", &descap);
-	free(co);
+	co = readfile(base, "capacity");
+	if (co == NULL)
+		return smprintf("");
 
-	co = readfile(base, "charge_now");
-	if (co == NULL) {
-		co = readfile(base, "energy_now");
-		if (co == NULL)
-			return smprintf("");
-	}
-	sscanf(co, "%d", &remcap);
-	free(co);
+	sscanf(co, "%d", &cap);
 
 	co = readfile(base, "status");
 	if (!strncmp(co, "Discharging", 11)) {
@@ -160,10 +147,7 @@ getbattery(char *base)
 		status = '?';
 	}
 
-	if (remcap < 0 || descap < 0)
-		return smprintf("invalid");
-
-	return smprintf("%.0f%%%c", ((float)remcap / (float)descap) * 100, status);
+	return smprintf("%d%%%c", cap, status);
 }
 
 char *
@@ -198,20 +182,31 @@ execscript(char *cmd)
 	return smprintf("%s", retval);
 }
 
+char *
+getwifi()
+{
+  return smprintf("%s", "W");
+}
+
+char *
+getbluetooth()
+{
+  return smprintf("%s", "BT");
+}
+
 int
 main(void)
 {
-	char *status;
-	char *avgs;
-	char *bat;
-	char *tmar;
-	char *tmutc;
-	char *tmbln;
 	char *t0;
 	char *t1;
-	char *kbmap;
-	char *surfs;
-	char *memes;
+	char *avgs;
+	char *bat;
+	char *wifi;
+	char *bt;
+	char *tmuk;
+	char *tmdk;
+	char *tmny;
+	char *status;
 
 	if (!(dpy = XOpenDisplay(NULL))) {
 		fprintf(stderr, "dwmstatus: cannot open display.\n");
@@ -219,32 +214,29 @@ main(void)
 	}
 
 	for (;;sleep(30)) {
-		avgs = loadavg();
-		bat = getbattery("/sys/class/power_supply/BAT0");
-		tmar = mktimes("%H:%M", tzargentina);
-		tmutc = mktimes("%H:%M", tzutc);
-		tmbln = mktimes("KW %W %a %d %b %H:%M %Z %Y", tzberlin);
-		kbmap = execscript("setxkbmap -query | grep layout | cut -d':' -f 2- | tr -d ' '");
-		surfs = execscript("surf-status");
-		memes = execscript("meme-status");
 		t0 = gettemperature("/sys/devices/virtual/thermal/thermal_zone0", "temp");
 		t1 = gettemperature("/sys/devices/virtual/thermal/thermal_zone1", "temp");
+		avgs = loadavg();
+		bat = getbattery("/sys/class/power_supply/BAT0");
+		wifi = getwifi();
+		bt = getbluetooth();
+		tmuk = mktimes("%H:%M", tzuk);
+		tmdk = mktimes("%H:%M", tzdk);
+		tmny = mktimes("%a %d %b %H:%M %Z %Y", tzny);
 
-		status = smprintf("S:%s M:%s K:%s T:%s|%s L:%s B:%s A:%s U:%s %s",
-				surfs, memes, kbmap, t0, t1, avgs, bat, tmar, tmutc,
-				tmbln);
+		status = smprintf("T:%s|%s L:%s B:%s U:%s D:%s %s",
+				t0, t1, avgs, bat, tmuk, tmdk, tmny);
 		setstatus(status);
 
-		free(surfs);
-		free(memes);
-		free(kbmap);
 		free(t0);
 		free(t1);
 		free(avgs);
 		free(bat);
-		free(tmar);
-		free(tmutc);
-		free(tmbln);
+		free(wifi);
+		free(bt);
+		free(tmuk);
+		free(tmdk);
+		free(tmny);
 		free(status);
 	}
 
